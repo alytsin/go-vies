@@ -1,21 +1,59 @@
 package vies
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
+	"net/http"
 )
+
+//const (
+//	AvailabilityAvailable          Availability = "available"
+//	AvailabilityUnavailable        Availability = "unavailable"
+//	AvailabilityMonitoringDisabled Availability = "monitoring disabled"
+//)
+
+type HttpClientInterface interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+type BatchResponseHandlerInterface interface {
+	Handle(content *[]byte) ([][]string, error)
+}
+
+type ApiError struct {
+	Err     string
+	Message string
+}
+
+func (e *ApiError) Error() string {
+	return fmt.Sprintf("%v: %v", e.Err, e.Message)
+}
 
 type CheckResult struct {
 	CountryCode string `json:"countryCode"`
+	Address     string `json:"address"`
 	VatNumber   string `json:"vatNumber"`
 	Vat         string `json:"vat"`
 	Valid       bool   `json:"valid"`
 	Name        string `json:"name"`
+	//Error       string `json:"error,omitempty"`
 }
 
+type batchToken struct {
+	Token string `json:"token"`
+}
+type BatchStatus struct {
+	Token      string  `json:"token"`
+	Status     string  `json:"status"`
+	Percentage float32 `json:"percentage"`
+}
+
+type Configuration struct {
+	MaximumRowsForBatch     int `json:"maximumRowsForBatch"`
+	MinimumRowsForBatch     int `json:"minimumRowsForBatch"`
+	MaximumFileSizeForBatch int `json:"maximumFileSizeForBatch"`
+}
 type Status struct {
-	Vow       StatusVow       `json:"vow"` // vow stands for VIES on the Web
+	Vow       StatusVow       `json:"vow"`
 	Countries []CountryStatus `json:"countries"`
 }
 
@@ -23,46 +61,9 @@ type StatusVow struct {
 	Available bool `json:"available"`
 }
 
-type Availability string
-
-const (
-	AvailabilityAvailable          Availability = "available"
-	AvailabilityUnavailable        Availability = "unavailable"
-	AvailabilityMonitoringDisabled Availability = "monitoring disabled"
-)
-
-func (a *Availability) UnmarshalJSON(data []byte) error {
-	var value string
-	if err := json.Unmarshal(data, &value); err != nil {
-		return err
-	}
-	value = strings.ToLower(value)
-
-	switch Availability(value) {
-	case AvailabilityAvailable,
-		AvailabilityUnavailable,
-		AvailabilityMonitoringDisabled:
-		*a = Availability(value)
-		return nil
-	default:
-		return fmt.Errorf("invalid availability: %q", value)
-	}
-}
-
-func (a Availability) MarshalJSON() ([]byte, error) {
-	switch a {
-	case AvailabilityAvailable,
-		AvailabilityUnavailable,
-		AvailabilityMonitoringDisabled:
-		return json.Marshal(string(a))
-	default:
-		return nil, fmt.Errorf("invalid availability: %q", a)
-	}
-}
-
 type CountryStatus struct {
-	CountryCode  string       `json:"countryCode"`
-	Availability Availability `json:"availability"`
+	CountryCode  string `json:"countryCode"`
+	Availability string `json:"availability"`
 }
 
 type statusErrorResponse struct {

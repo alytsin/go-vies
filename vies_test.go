@@ -3,11 +3,12 @@ package vies
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,6 +23,18 @@ func NewTestClient(fn RoundTripFunc) *http.Client {
 	return &http.Client{
 		Transport: RoundTripFunc(fn),
 	}
+}
+
+func TestXxx(t *testing.T) {
+	v, _ := NewClient(nil)
+	r, e := v.Batch(context.Background(), []string{"EE100530248", "EE101288462", "EE102103009", "EE100530247"})
+	t.Log(e)
+	t.Log(r)
+	time.Sleep(time.Millisecond * 1000)
+	log.Println(v.BatchStatus(context.Background(), r))
+
+	log.Println(v.BatchReport(context.Background(), r))
+
 }
 
 func TestParseError(t *testing.T) {
@@ -39,7 +52,7 @@ func TestParseError(t *testing.T) {
 		{
 			"invalid response structure",
 			[]byte(`{}`),
-			errors.New("invalid response structure"),
+			errors.New("unexpected response structure"),
 		},
 		{
 			"valid error",
@@ -50,7 +63,7 @@ func TestParseError(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &Validator{}
+			v := &Client{}
 			err := v.doError(&tt.body)
 			assert.Error(t, err)
 			assert.Equal(t, tt.want.Error(), err.Error())
@@ -60,90 +73,91 @@ func TestParseError(t *testing.T) {
 
 }
 
-func TestAvailabilityMarshalJSON(t *testing.T) {
-	t.Run("valid", func(t *testing.T) {
-		data, err := json.Marshal(AvailabilityAvailable)
-		assert.NoError(t, err)
-		assert.Equal(t, `"available"`, string(data))
-	})
-
-	t.Run("invalid", func(t *testing.T) {
-		_, err := json.Marshal(Availability("bogus"))
-		assert.Error(t, err)
-		assert.Equal(t, `json: error calling MarshalJSON for type vies.Availability: invalid availability: "bogus"`, err.Error())
-	})
-}
-
-func TestAvailabilityUnmarshalJSON(t *testing.T) {
-	t.Run("valid values", func(t *testing.T) {
-		cases := []struct {
-			name  string
-			input string
-			want  Availability
-		}{
-			{
-				name:  "available mixed case",
-				input: `"Available"`,
-				want:  AvailabilityAvailable,
-			},
-			{
-				name:  "unavailable lower",
-				input: `"unavailable"`,
-				want:  AvailabilityUnavailable,
-			},
-			{
-				name:  "monitoring disabled mixed case",
-				input: `"Monitoring Disabled"`,
-				want:  AvailabilityMonitoringDisabled,
-			},
-		}
-
-		for _, tt := range cases {
-			t.Run(tt.name, func(t *testing.T) {
-				var v Availability
-				err := json.Unmarshal([]byte(tt.input), &v)
-				assert.NoError(t, err)
-				assert.Equal(t, tt.want, v)
-			})
-		}
-	})
-
-	t.Run("invalid value", func(t *testing.T) {
-		var v Availability
-		err := json.Unmarshal([]byte(`"bogus"`), &v)
-		assert.Error(t, err)
-		assert.Equal(t, `invalid availability: "bogus"`, err.Error())
-	})
-
-	t.Run("invalid type", func(t *testing.T) {
-		var v Availability
-		err := json.Unmarshal([]byte(`123`), &v)
-		assert.Error(t, err)
-		assert.Equal(t, "json: cannot unmarshal number into Go value of type string", err.Error())
-	})
-}
+//
+//func TestAvailabilityMarshalJSON(t *testing.T) {
+//	t.Run("valid", func(t *testing.T) {
+//		data, err := json.Marshal(AvailabilityAvailable)
+//		assert.NoError(t, err)
+//		assert.Equal(t, `"available"`, string(data))
+//	})
+//
+//	t.Run("invalid", func(t *testing.T) {
+//		_, err := json.Marshal(Availability("bogus"))
+//		assert.Error(t, err)
+//		assert.Equal(t, `json: error calling MarshalJSON for type vies.Availability: invalid availability: "bogus"`, err.Error())
+//	})
+//}
+//
+//func TestAvailabilityUnmarshalJSON(t *testing.T) {
+//	t.Run("valid values", func(t *testing.T) {
+//		cases := []struct {
+//			name  string
+//			input string
+//			want  Availability
+//		}{
+//			{
+//				name:  "available mixed case",
+//				input: `"Available"`,
+//				want:  AvailabilityAvailable,
+//			},
+//			{
+//				name:  "unavailable lower",
+//				input: `"unavailable"`,
+//				want:  AvailabilityUnavailable,
+//			},
+//			{
+//				name:  "monitoring disabled mixed case",
+//				input: `"Monitoring Disabled"`,
+//				want:  AvailabilityMonitoringDisabled,
+//			},
+//		}
+//
+//		for _, tt := range cases {
+//			t.Run(tt.name, func(t *testing.T) {
+//				var v Availability
+//				err := json.Unmarshal([]byte(tt.input), &v)
+//				assert.NoError(t, err)
+//				assert.Equal(t, tt.want, v)
+//			})
+//		}
+//	})
+//
+//	t.Run("invalid value", func(t *testing.T) {
+//		var v Availability
+//		err := json.Unmarshal([]byte(`"bogus"`), &v)
+//		assert.Error(t, err)
+//		assert.Equal(t, `invalid availability: "bogus"`, err.Error())
+//	})
+//
+//	t.Run("invalid type", func(t *testing.T) {
+//		var v Availability
+//		err := json.Unmarshal([]byte(`123`), &v)
+//		assert.Error(t, err)
+//		assert.Equal(t, "json: cannot unmarshal number into Go value of type string", err.Error())
+//	})
+//}
 
 func TestNewValidator(t *testing.T) {
 	t.Run("default endpoint and client", func(t *testing.T) {
-		v, err := NewValidator(nil, "")
+		v, err := NewClient(nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, v)
-		assert.Equal(t, http.DefaultClient, v.client)
-		assert.Equal(t, ViesEndpointUrl, v.endpoint.String())
+		assert.Equal(t, http.DefaultClient, v.httpClient)
+		assert.Equal(t, apiEndpointUrl, v.endpoint.String())
 	})
 
 	t.Run("custom endpoint and client", func(t *testing.T) {
 		client := &http.Client{}
 		endpoint := "https://example.com/api/"
-		v, err := NewValidator(client, endpoint)
+		v, err := NewClient(&ClientConfig{HttpClient: client, EndpointUrl: endpoint})
 		assert.NoError(t, err)
 		assert.NotNil(t, v)
-		assert.Equal(t, client, v.client)
+		assert.Equal(t, client, v.httpClient)
 		assert.Equal(t, endpoint, v.endpoint.String())
 	})
 
 	t.Run("invalid endpoint", func(t *testing.T) {
-		v, err := NewValidator(&http.Client{}, "http://[::1")
+		v, err := NewClient(&ClientConfig{HttpClient: &http.Client{}, EndpointUrl: "http://[::1"})
 		assert.Nil(t, v)
 		assert.Error(t, err)
 	})
@@ -176,7 +190,7 @@ func TestValidatorDoJSON(t *testing.T) {
 			}
 		})
 
-		v, err := NewValidator(client, "https://example.com/api/")
+		v, err := NewClient(&ClientConfig{client, "https://example.com/api/", nil})
 		assert.NoError(t, err)
 
 		var out responsePayload
@@ -204,7 +218,7 @@ func TestValidatorDoJSON(t *testing.T) {
 			}
 		})
 
-		v, err := NewValidator(client, "https://example.com/api/")
+		v, err := NewClient(&ClientConfig{client, "https://example.com/api/", nil})
 		assert.NoError(t, err)
 
 		var out responsePayload
@@ -224,7 +238,7 @@ func TestValidatorDoJSON(t *testing.T) {
 			}
 		})
 
-		v, err := NewValidator(client, "https://example.com/api/")
+		v, err := NewClient(&ClientConfig{client, "https://example.com/api/", nil})
 		assert.NoError(t, err)
 
 		var out responsePayload
@@ -232,7 +246,7 @@ func TestValidatorDoJSON(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, "err: msg", err.Error())
 
-		var vErr *ValidationError
+		var vErr *ApiError
 		assert.ErrorAs(t, err, &vErr)
 	})
 
@@ -245,7 +259,7 @@ func TestValidatorDoJSON(t *testing.T) {
 			}
 		})
 
-		v, err := NewValidator(client, "https://example.com/api/")
+		v, err := NewClient(&ClientConfig{client, "https://example.com/api/", nil})
 		assert.NoError(t, err)
 
 		var out responsePayload
@@ -260,7 +274,7 @@ func TestValidatorDoJSON(t *testing.T) {
 			return nil
 		})
 
-		v, err := NewValidator(client, "https://example.com/api/")
+		v, err := NewClient(&ClientConfig{client, "https://example.com/api/", nil})
 		assert.NoError(t, err)
 
 		var out responsePayload
@@ -290,7 +304,7 @@ func TestValidatorCheck(t *testing.T) {
 			}
 		})
 
-		v, err := NewValidator(client, "https://example.com/api/")
+		v, err := NewClient(&ClientConfig{client, "https://example.com/api/", nil})
 		assert.NoError(t, err)
 
 		result, err := v.Check(context.Background(), "ee123")
@@ -305,10 +319,10 @@ func TestValidatorCheck(t *testing.T) {
 	})
 
 	t.Run("invalid vat length", func(t *testing.T) {
-		v, err := NewValidator(NewTestClient(func(req *http.Request) *http.Response {
+		v, err := NewClient(&ClientConfig{NewTestClient(func(req *http.Request) *http.Response {
 			t.Fatalf("unexpected request: %v", req)
 			return nil
-		}), "https://example.com/api/")
+		}), "https://example.com/api/", nil})
 		assert.NoError(t, err)
 
 		result, err := v.Check(context.Background(), "E")
@@ -328,7 +342,7 @@ func TestValidatorCheck(t *testing.T) {
 			}
 		})
 
-		v, err := NewValidator(client, "https://example.com/api/")
+		v, err := NewClient(&ClientConfig{client, "https://example.com/api/", nil})
 		assert.NoError(t, err)
 
 		result, err := v.Check(context.Background(), "EE123")
@@ -350,7 +364,7 @@ func TestValidatorValid(t *testing.T) {
 			}
 		})
 
-		v, err := NewValidator(client, "https://example.com/api/")
+		v, err := NewClient(&ClientConfig{client, "https://example.com/api/", nil})
 		assert.NoError(t, err)
 
 		ok, err := v.Valid(context.Background(), "EE123")
@@ -359,10 +373,10 @@ func TestValidatorValid(t *testing.T) {
 	})
 
 	t.Run("returns error from check", func(t *testing.T) {
-		v, err := NewValidator(NewTestClient(func(req *http.Request) *http.Response {
+		v, err := NewClient(&ClientConfig{NewTestClient(func(req *http.Request) *http.Response {
 			t.Fatalf("unexpected request: %v", req)
 			return nil
-		}), "https://example.com/api/")
+		}), "https://example.com/api/", nil})
 		assert.NoError(t, err)
 
 		ok, err := v.Valid(context.Background(), "E")
@@ -387,7 +401,7 @@ func TestViesCheck(t *testing.T) {
 			response: `{"vow": {"available": true},"countries": [{"countryCode": "EE","availability": "Available"}]}`,
 			status: &Status{
 				Vow:       StatusVow{Available: true},
-				Countries: []CountryStatus{{CountryCode: "EE", Availability: AvailabilityAvailable}},
+				Countries: []CountryStatus{{CountryCode: "EE", Availability: "Available"}},
 			},
 		},
 		{
@@ -402,7 +416,7 @@ func TestViesCheck(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			client := NewTestClient(func(req *http.Request) *http.Response {
-				assert.Contains(t, req.URL.String(), ViesCheckStatusPath)
+				assert.Contains(t, req.URL.String(), apiCheckStatusPath)
 				return &http.Response{
 					StatusCode: tt.httpCode,
 					Body:       io.NopCloser(bytes.NewBufferString(tt.response)),
@@ -410,7 +424,7 @@ func TestViesCheck(t *testing.T) {
 				}
 			})
 
-			v, err := NewValidator(client, "")
+			v, err := NewClient(&ClientConfig{HttpClient: client})
 			assert.NoError(t, err)
 			assert.NotNil(t, v)
 

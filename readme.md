@@ -16,7 +16,7 @@ import (
 
 func main() {
 
-	v, err := vies.NewValidator(nil, "")
+	v, err := vies.NewClient(nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
