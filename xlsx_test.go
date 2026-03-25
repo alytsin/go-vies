@@ -1,35 +1,10 @@
 package vies
 
 import (
-	"io"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func TestName(t *testing.T) {
-
-	f, err := os.Open("test.xlsx")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-
-	content, err := io.ReadAll(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	r := SpreadsheetMlReader{}
-	data, err := r.Handle(&content)
-	t.Log(err)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(data)
-
-}
 
 func TestBase26(t *testing.T) {
 	r := SpreadsheetMlReader{}
